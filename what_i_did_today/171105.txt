@@ -1,0 +1,18 @@
+■GitHubプッシュにハマる
+cloneできない
+ssh keyを登録しても同じ
+ssh -T git@github.com
+秘密鍵がtoo openだと怒られた
+chmod 600 ~/.ssh/id_rsa
+ssh -T git@github.com
+successfully authenticated, "but github does not provide shell access" <- ?
+git clone
+ダメ。なんで？
+SourceTreeからトライ
+ssh auth失敗って言われる
+ssh key設定した
+git bashでやってみると公開鍵のpermissionがおかしい？
+一回カギ作り直して、
+githubに再登録して、
+SourceTreeに秘密鍵登録して、
+もう一回トライしたら成功

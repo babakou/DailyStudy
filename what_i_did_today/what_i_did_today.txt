@@ -1,0 +1,279 @@
+アプリサーバ構築の素振り編
+
+■ cygwinでemacsのbuild
+ダメでした
+25.3のコード落として、
+IMEパッチ当てようとした
+patchコマンド入ってなかったから入れた
+パッチ当てて./configureしたけど、IME有効になってなさげ
+./autogen.shしようとしたらautoconf, automake入ってないって怒られた
+入れて./autogen.shしたらtputsが無いって言ってくる
+libncurses入れた
+もっかい./autogen.shしたらm4がエラー吐く
+
+ここであきらめてNTEmacs25.3入れた。
+
+■ NTEmacs25.3
+shellするとspawning child process
+ユーザ環境変数にSHELLをwinパスで入れたら直った
+
+plink入れたらtrampも行けた！キタコレ
+
+plink user@IP|sudo:IP:/path でsudoでtrampアクセスできる。
+raspi上のファイル編集めっちゃ楽になるよ！
+
+■cygwinでemacsのbuild 再トライ
+したらいけた。./autogen.sh通ったらすんなり。
+
+■ 外部公開Review Boardの仕込み
+まずはFreeBSDにGBを立ち上げるとこから！
+
+  ◇ FreeBSDにGB構築
+       ◇ tomcatを入れた
+       10.2はサポート外になったらしく、pkgでのインストールができなくなってる。
+       なんかライブラリが無いか何かで失敗してる。
+       あきらめて10.3にした。
+
+       ブリッジアダプタにして起動したら最初から外に出られるようになってた。素晴らしー
+       /etc/rc.confにsshd_enableしてreboot
+       ssh用のユーザ作って以降はsshでアクセスして作業
+
+       pkg search tomcatして、最新っぽいものをpkg installした --> /usr/local/apache-tomcat-8.5
+       色々しろと言われたから色々した
+       ついでにzshも入れた
+
+       tomcat用のユーザ作ろうとしたら、www:wwwはもうあった
+       installしたtomcatをchown -R www:www して、
+       /etc/rc.confにtomcat85_enable = "YES"して、/usr/local/etc/rc.d/tomcat85 startしたら起動。
+       URLアクセスしたら表示された！やったぜ。
+
+       ◇ DHCPのままで
+       スリープのたびにIP変わるっぽいから固定IPにしたら外から出られなくなった。
+       /etc/resolv.confにnameserver 8.8.8.8入れても×。仕方ないからDHCPに戻した。
+
+       ◇ nginxを入れる
+       pkg search して pkg install
+       rootで/usr/local/etc/rc.d/nginx start
+       URLアクセスしたら表示 やったぜ。
+       nginxもchown -R www:wwwした。
+
+       ◇ GB3.3をデプロイ
+       curl -OL (gitbucket.warのアドレス)で落としてくる
+       /usr/local/apache-tomcat-8.5/webappsにcp
+       改めてapache-tomcat-8.5以下をchownして、tomcat restart
+       tomcat始まらない...なぜだ
+
+       とりあえずopenjdk-8を入れる
+       もっかいtomcat restartしてみたが、startingから動かないのは変わらず。
+
+       .warの権限を755にしてもダメ。java -jar gitbucket.warしてもなぜかダメ。
+       いったんサーバ再起動。
+       そしたら入れた！
+
+       が、H2DBがreadonlyとか言われる...
+
+       gitbucketの権限を755にしてもダメ。
+       gitbucketの権限を1777にしてもダメ。
+
+       ググってこんなページ見つけた: https://qiita.com/kkimura/items/f51303d3beba02e3e781
+       GITBUCKET_HOMEを設定せよ、とのこと。
+       /home/gitbucketを作ってGITBUCKET_HOMEに設定。www:wwwにownerにしておく。
+       /etc/rc.confにexport GITBUCKET_HOME=/home/gitbucketを追加。
+       もともとのwebapps/gitbucketはrm。
+       再度トライしたら、うまくいった！
+
+       ◇ nginxと連携
+       /usr/local/etc/nginx/nginx.confをいじる
+       userをwwwに、
+       ↓こんなの追加
+       location /gitbucket {
+            proxy_pass http://localhost:8080/gitbucket;
+       }
+       たぶん、locationとしてgitbucketを指定されたときは、
+       localhost:8080/gitbucketにフォワードするという設定なんだろう。
+
+       これでport 80でもgitbucketにアクセスできた！
+
+       ◇ push成功するまで
+       adminメニューからbase urlを変えて、sshでのアクセス許可。
+       結局コマンドラインからはpushできず、source treeからpushしたら上手くいった。なんだそれ
+
+
+■ ReviewBoardを別サーバに入れてみる
+   ◇ CentOSサーバを立ち上げる
+   無線と有線、両方ブリッジに入れてみた
+   適当に日本の環境に合わせた。
+   ユーザbabakouを追加。rootパスはいつもの。
+   外へのpingは通る。よし。
+   まずは
+   sudo yum update
+   sudo yum upgrade これは意味なかった
+
+   ◇ RB公式サイトを読んでみる
+   - python2.7が入ってること前提
+   - MySQL or PostgreSQLが入ってること前提
+   - Webサーバはapacheにしとけ、悪いこと言わないから...
+   と書いてある。従う。
+
+   ◇ python2.7入れる
+   最初から入ってる！
+
+   ◇ MySQL入れる
+   参考 http://inscrutable.seesaa.net/article/446917577.html
+
+   yum repo追加がうまくいかない
+   wgetしてローカルインストールする作戦に切り替える
+   yum install wget
+   wget https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm
+   rpm -Uvh mysql57-community-release-el7-11.noarch.rpm
+
+   # どうやらこれは「yumリポジトリの追加」だけで、この後に
+   # yum install mysql-community-serverすると、最新のMySQLがインストールできる...ということらしい。
+
+   mysqlの設定ファイルは/etc/my.cnf
+   logに位置が/var/log/mariadb/mariadb.logに変わってるっぽい？
+
+   systemctl enable mysqld.service したら怒られた！
+   どうやらmysql-community-serverをinstallしないといけないらしい。
+   ref: http://dqn.sakusakutto.jp/2012/11/etcinitdmysqld_mysql-server.html
+   その前にepel入れる。その中に入ってるかもしれないし。
+
+   yum install epel-release
+
+   mariadb消しておく
+
+   yum remove mariadb-libs
+
+   改めてmysql入れる
+
+   yum install mysql-community-server
+
+   mysqld --version --> 5.7.20 最新版入っている。
+
+   /etc/my.cnfに設定した。
+
+   systemctl enable mysqld.service
+   systemctl start mysqld.service
+   systemctl -all 動いている。
+   
+   /var/log/mysqld.logに初期パス書いてある。
+
+   [mysql]
+   default-character-set = utf8 これがunknownと言われる。消した。
+
+   mysql-secure-installation
+   初期パスでログイン
+   パス変更を求められる 厳しい
+   "Aから始まるいつもの&qから始まるいつもの"にした。
+
+   その後また変更できる。
+   いつものにした。
+   と思ったらそれもポリシー違反、しょうがないので
+   "Aから始まるいつもの&qから始まるいつもの"にした。
+
+   anonymousユーザは消しておく
+   rootはlocalhostからしか入れないようにしておく
+   testユーザとtest DBも消しておく
+   特権テーブルリロードする
+   all done.
+
+   RB用のDBとユーザ作る
+   mysql -u root -p
+   パス入れる
+   mysql> create database reviewboard;
+   mysql> grant all on reviewboard.* to reviewboard@localhost identified by 'いつもの@RB'
+   mysql> exit
+
+   RBインストール
+   yum install ReviewBoard
+
+   RB install 公式見たら [client] にdefault-character-set = utf8しろと書いてあったから入れた
+   DB再起動 systemctl mysqld.service restart
+
+   途中からここ参考にした
+   https://www.reviewboard.org/docs/manual/dev/admin/installation/linux/
+
+   rb-site install /var/www/html/reviewboard
+   Domain Name:localhost
+   Root Path:/ (http://xxxx.co.jp/reviewboard みたいなURLになる)
+   Database Type:1(mysql)
+   Database Name [reviewboard]: (空欄)
+   Database Server [localhost]: (空欄)
+   Database Username: reviewboard
+   Database Password: いつもの@RB
+
+   ここで別窓開いてmemcached入れた
+   yum install memcached
+   Memcache Server [localhost:11211]: (空欄)
+   
+   Username [admin]: (空欄)
+   Password: いつもの
+   E-Mail Address: hogehoge@example.com
+   Company/Organization Name (optional): (空欄)
+   Allow us to ...: n
+
+   RBがインストールされた。
+
+   色々必要そうなのでpipを入れる
+   yum install python-pip
+   pip install --upgrade pip 8.1.2 -> 9.0.1にアップした
+
+   pip install -U setuptools 特に意味はなかったくさい
+
+   yum install python-devel
+
+   pip install python-memcached もう入ってた
+
+   Gitを入れる
+   apt-get install git-core もう入ってた クッソ古いけどまあいいや
+
+   mod_wsgiを入れる。公式に入れろって書いてあるし
+   pip install mod_wsgi
+   apxsが無いって怒られた。入れる
+   yum install httpd-devel
+
+   もっかいpip install mod_wsgi
+   gccが無いと怒られた。入ってないのかよ！
+   yum install gcc
+
+   もっかいpip install mod_wsgi
+   インストールされた。
+
+   RB以下のhtdocsとdataの所有者をapacheにする
+   chown -R apache /var/www/html/reviewboard/htdocs/media/uploaded/
+   chown -R apache /var/www/html/reviewboard/data
+
+   設定ファイルをapacheにデプロイ
+   cp /var/www/html/reviewboard/conf/apache-wsgi.conf /etc/httpd/conf.d/
+
+   再起動してみる
+   systemctl restart httpd
+
+   URLアクセス -> ダメ
+
+   ファイアウォール開ける
+   firewall-cmd --permanent --add-service=http
+
+   再度アクセス -> ダメ
+   reboot サーバ再起動
+   再度アクセス -> 400が返ってきた
+
+   SELinux回避してみる
+   setsebool -P httpd_can_network_memcache 1
+   setsebool -P httpd_can_network_connect_db 1
+   setsebool -P httpd_unified 1
+
+   再度アクセス -> ダメ
+
+   /var/log/httpd/errorlogを見てみる
+   AH00558: httpd: Could not reliably determine the server's fully qualified domain name, using localhost.localdomain. Set the 'ServerName' directive globally to suppress this message
+   サーバ名が怪しい
+
+   /etc/httpd/conf.d/apache-wsgi.confのServerNameをIP直にしてみる -> ダメ
+   
+   /var/www/html/reviewboard/conf/settings_local.pyのALLOWED_HOSTSを['*']にしてみた
+   再度アクセス --> ｷﾀーーー
+
+   一回再起動
+   systemctl enable httpd
+   systemctl enable memcached

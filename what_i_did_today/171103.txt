@@ -1,0 +1,35 @@
+■cygwinでEmacsビルド
+できた。
+./autogen.shが何故かうまく動いた。
+./configure
+make
+make install
+/usr/local/bin/emacs で動いた。
+
+■shellが動かない...
+M-x shell
+Program not found
+なぜ？多分SHELLがwinパスだから...
+"\"を"/"に変えてみたけどダメ
+
+こんな時はzshのエイリアス！
+emacs='/usr/local/bin/emacs'
+これで動いた！
+
+~/.zshrcにSHELL=/bin/zshを書いても良かった。
+
+■ カーソル見づらい...
+cygwin側の設定いじって解決
+
+■ globalが動かない...
+GTAGS not foundって言われる...
+shellからgtagsは動くんだけど。
+
+globalをCygwinでビルドしてみる
+./configure --prefix=/cygdrive/c/...
+make
+make install
+binにパス通してggtags-find-file
+動いた！
+
+■ 
