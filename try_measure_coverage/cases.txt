@@ -1,0 +1,15 @@
+- 5
+[1] less than
+[3] upper
+
+- 10
+[1] less than
+[2] upper
+
+- 50
+[1] less than
+[3] upper
+
+- 100
+[1] less than
+[3] upper
