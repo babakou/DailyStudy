@@ -351,3 +351,23 @@ BIOSで仮想化支援設定をOn
 仮想マシンと通信できるWPFアプリを作ってみたい。
 まずはechoから。
 良く分からんのでmsdnのサンプルを見てみる
+--------------------------------------------------------------------------------
+2/4
+
+色々。
+ラズパイとrsyncできるようになったり、
+CでGPIO叩けるようになったり、
+Cでopencv叩けるようになったり。
+
+cv::isOpened()失敗問題
+https://stackoverflow.com/questions/31923327/why-does-videocapture-isopened-fail-with-my-working-camera-using-opencv-on-a-r
+
+cygwin上でもopencv動かせるようにした。
+ライブラリはここからとってきた。
+http://hvrl.ics.keio.ac.jp/kimura/opencv/opencv-3.4.0.html.ja
+
+動かすときに共有ライブラリが無いと言われたら、
+- PATHにopencvのlibフォルダが入っているか確認
+- cygcheck (バイナリ) で足りないdllを確認して、setup.exeでとってくる
+
+今回はこれで動いてくれた
